@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "agent": "link:../agent",
+    "rag": "link:../../packages/rag",
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
     "pg": "^8.12.0",

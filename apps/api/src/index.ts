@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import dotenv from 'dotenv';
 import { Client } from 'pg';
 import { runAgent } from 'agent/src/index';
+import { answerFaq } from 'rag/src/rag';
 
 dotenv.config();
 
@@ -42,6 +43,22 @@ async function start() {
       return reply
         .code(500)
         .send({ ok: false, error: err?.message || 'Agent failed' });
+    }
+  });
+
+  fastify.post('/agent/faq', async (req, reply) => {
+    const body: any = req.body || {};
+    const query = String(body.query || '');
+    if (!query) return reply.code(400).send({ error: 'query is required' });
+    try {
+      const res = await answerFaq(query);
+      console.log('res', res);
+      return reply.code(200).send(res);
+    } catch (err: any) {
+      req.log.error({ err }, 'faq_error');
+      return reply
+        .code(500)
+        .send({ ok: false, error: err?.message || 'FAQ failed' });
     }
   });
 

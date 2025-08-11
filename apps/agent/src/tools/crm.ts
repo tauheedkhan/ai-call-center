@@ -24,7 +24,6 @@ const MOCK_DB: Record<string, any> = {
 
 export async function crmLookup(input: z.infer<typeof crmLookupSchema>) {
   const rec = MOCK_DB[input.customerId];
-  console.log('crmLookup', input, rec);
   if (!rec) return { found: false };
   return { found: true, customer: rec };
 }
