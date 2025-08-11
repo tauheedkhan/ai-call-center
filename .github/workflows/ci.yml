@@ -1,0 +1,16 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - run: corepack enable
+      - run: corepack prepare pnpm@9 --activate
+      - run: pnpm install
+      - run: pnpm run typecheck
+      - run: pnpm -C apps/api build

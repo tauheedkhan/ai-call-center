@@ -1,0 +1,21 @@
+version: '3.9'
+services:
+  db:
+    image: ankane/pgvector:latest
+    container_name: aicenter-db
+    environment:
+      POSTGRES_DB: aicenter
+      POSTGRES_USER: aiuser
+      POSTGRES_PASSWORD: aipass
+    ports:
+      - '5432:5432'
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U aiuser -d aicenter']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  db_data:
