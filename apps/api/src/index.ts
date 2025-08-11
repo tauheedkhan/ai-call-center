@@ -4,10 +4,25 @@ import { Client } from 'pg';
 import { runAgent } from 'agent/src/index';
 import { answerFaq } from 'rag/src/rag';
 import { runGraph } from 'agent/src/graph';
+import formbody from '@fastify/formbody';
+import Twilio from 'twilio';
 
 dotenv.config();
 
 const fastify = Fastify({ logger: true });
+await fastify.register(formbody);
+
+function verifyTwilio(req: any) {
+  const signature = req.headers['x-twilio-signature'];
+  const url = (process.env.PUBLIC_BASE_URL || '') + req.raw.url; // absolute URL Twilio hits
+  const valid = Twilio.validateRequest(
+    process.env.TWILIO_AUTH_TOKEN || '',
+    signature,
+    url,
+    req.body || {},
+  );
+  if (!valid) throw new Error('Invalid Twilio signature');
+}
 
 fastify.get('/health', async () => {
   return { ok: true, ts: new Date().toISOString() };
@@ -92,6 +107,61 @@ async function start() {
       return reply
         .code(500)
         .send({ ok: false, error: err?.message || 'Graph failed' });
+    }
+  });
+
+  // 1) Answer the call and start a speech Gather
+  fastify.post('/twilio/voice', async (req, reply) => {
+    // verifyTwilio(req); // enable once PUBLIC_BASE_URL is correct
+    const vr = new Twilio.twiml.VoiceResponse();
+    const gather = vr.gather({
+      input: 'speech',
+      speechTimeout: 'auto', // end of utterance detection
+      language: 'en-US', // change if needed
+      action: '/twilio/handle-speech', // relative to PUBLIC_BASE_URL
+      method: 'POST',
+    });
+    gather.say({ voice: 'Polly.Amy' }, 'Hello. How can I help you today?');
+    vr.redirect('/twilio/voice'); // if nothing heard, prompt again
+    reply.header('Content-Type', 'text/xml');
+    return reply.send(vr.toString());
+  });
+
+  // 2) Handle the speech result -> run graph -> reply to caller
+  fastify.post('/twilio/handle-speech', async (req, reply) => {
+    // verifyTwilio(req);
+    const vr = new Twilio.twiml.VoiceResponse();
+    const body: any = req.body || {};
+    const callSid = String(body.CallSid || 'local-call');
+    const transcript = String(body.SpeechResult || '').trim();
+
+    if (!transcript) {
+      vr.say(
+        { voice: 'Polly.Amy' },
+        'I did not catch that. Please say it again.',
+      );
+      vr.redirect('/twilio/voice');
+      reply.header('Content-Type', 'text/xml');
+      return reply.send(vr.toString());
+    }
+
+    try {
+      const { runGraph } = await import('../../agent/src/graph');
+      const res = await runGraph(transcript, callSid);
+
+      // Respond with the agent answer
+      const answer = res?.answer || 'Sorry, I could not find that information.';
+      vr.say({ voice: 'Polly.Amy' }, answer);
+
+      // Loop for another turn
+      vr.redirect('/twilio/voice');
+      reply.header('Content-Type', 'text/xml');
+      return reply.send(vr.toString());
+    } catch (err) {
+      req.log.error({ err }, 'twilio_handle_error');
+      vr.say({ voice: 'Polly.Amy' }, 'Sorry, something went wrong. Goodbye.');
+      reply.header('Content-Type', 'text/xml');
+      return reply.send(vr.toString());
     }
   });
 
