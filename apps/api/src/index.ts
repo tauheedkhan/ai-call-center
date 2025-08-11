@@ -52,7 +52,16 @@ async function start() {
     if (!query) return reply.code(400).send({ error: 'query is required' });
     try {
       const res = await answerFaq(query);
-      console.log('res', res);
+      // Trim heavy text, keep provenance
+      const brief = (res.retrieved || []).slice(0, 5).map((r: any) => ({
+        score: r.score,
+        source: r.source,
+        chunk: r.chunk,
+      }));
+      req.log.info(
+        { event: 'rag_retrieved', query, brief },
+        'retrieval_context',
+      );
       return reply.code(200).send(res);
     } catch (err: any) {
       req.log.error({ err }, 'faq_error');
