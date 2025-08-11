@@ -1,0 +1,8 @@
+{
+  "node_version": "20",
+  "dependencies": ["."],
+  "graphs": {
+    "call_center": "./apps/agent/src/graph.ts:compileGraph"
+  },
+  "env": "./.env.studio"
+}

@@ -5,3 +5,6 @@ node_modules
 .dist
 dist
 coverage
+.env.studio
+# LangGraph API
+.langgraph_api
