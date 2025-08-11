@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { Client } from 'pg';
 import { runAgent } from 'agent/src/index';
 import { answerFaq } from 'rag/src/rag';
+import { runGraph } from 'agent/src/graph';
 
 dotenv.config();
 
@@ -68,6 +69,29 @@ async function start() {
       return reply
         .code(500)
         .send({ ok: false, error: err?.message || 'FAQ failed' });
+    }
+  });
+
+  fastify.post('/graph/run', async (req, reply) => {
+    const body: any = req.body || {};
+    const query = String(body.query || '');
+    const threadId = String(body.threadId || 'local-thread');
+    if (!query) return reply.code(400).send({ error: 'query is required' });
+    try {
+      const res = await runGraph(query, threadId);
+      return {
+        ok: true,
+        threadId,
+        intent: res.intent,
+        answer: res.answer,
+        citations: res.citations,
+        confidence: res.confidence,
+      };
+    } catch (err: any) {
+      req.log.error({ err }, 'graph_error');
+      return reply
+        .code(500)
+        .send({ ok: false, error: err?.message || 'Graph failed' });
     }
   });
 
